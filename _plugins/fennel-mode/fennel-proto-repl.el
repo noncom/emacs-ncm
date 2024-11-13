@@ -996,8 +996,10 @@ the REPL buffer."
          (command (if (fboundp 'split-string-shell-command)
                       (split-string-shell-command command)
                     (split-string command)))
-		 (message "-- Make Fennel process: '%s'" (car command)
-		 (with-eval-after-load 'rg (debug))
+		 ;; --- For Emacs debugging ---
+		 ;; (message "-- Make Fennel process: '%s'" (car command)
+		 ;; (with-eval-after-load 'rg (debug))
+		 ;; ----------------------------
          (proc (make-process
                 :name (car command)
                 :buffer (generate-new-buffer-name " fennel-proto-repl")

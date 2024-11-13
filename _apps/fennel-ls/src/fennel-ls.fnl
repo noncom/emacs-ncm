@@ -1,4 +1,4 @@
-(require :fennel)
+(local fennel (require :fennel))
 (local dispatch (require :fennel-ls.dispatch))
 (local json-rpc (require :fennel-ls.json-rpc))
 
@@ -29,13 +29,24 @@
     (if should-err?
       (os.exit 1))))
 
+(var i 0)
+
 (λ main-loop [in out]
+  (io.stderr:write (.. " --------------------- STARTING i=" (tostring i) "------------------------\n"))
+  (io.stderr:write (.. " ------ in: " (fennel.view in)))
+  (io.stderr:write (.. " ------ out: " (fennel.view out)))
+  (io.stderr:write (.. " ------ methods: " (fennel.view io)))
   (local send (partial json-rpc.write out))
   (local server {})
   (while true
-    (let [msg (json-rpc.read in)]
+	(io.stderr:write (.. "-- Before json-rpc.read -- i=" (tostring i) "\n"))
+    (set i (+ i 1))
+	(let [msg (json-rpc.read in)]
+	  (io.stderr:write " ============================================================ ")
+	  (io.stderr:write (.. "\n --------------- in msg=" (fennel.view msg) "\n\n"))
 	  (if msg
-		(dispatch.handle server send msg)))))
+		(do
+			(dispatch.handle server send msg))))))
 
 (λ main []
   (case arg

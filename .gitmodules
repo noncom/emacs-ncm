@@ -1,0 +1,6 @@
+[submodule "_plugins/_janet/ajrepl"]
+	path = _plugins/_janet/ajrepl
+	url = https://github.com/sogaiu/ajrepl.git
+[submodule "_plugins/_janet/janet-ts-mode"]
+	path = _plugins/_janet/janet-ts-mode
+	url = https://github.com/sogaiu/janet-ts-mode.git

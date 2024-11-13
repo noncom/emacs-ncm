@@ -1,3 +1,3 @@
 pushd "%~dp0"
-lua fennel-ls.lua
+lua fennel-ls
 popd

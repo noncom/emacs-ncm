@@ -1,8 +1,12 @@
 ;;; Originally based on Emfy 0.4.0 <https://github.com/susam/emfy>
 
+;;; (require 's)
+
 ;;; ------------------------------------------------------------------
 ;;; 	Look and Feel
 ;;; ------------------------------------------------------------------
+
+;;(custom-set-variables)
 
 ;; Tweak UI.
 (when (display-graphic-p)
@@ -12,16 +16,21 @@
 (setq inhibit-startup-screen t)
 (column-number-mode)
 
+;; NO BEEPING
+(setq visible-bell 0)
+
 ;; Dark theme.
-(load-theme 'wombat)
-(with-eval-after-load 'wombat-theme
-  (set-face-background 'default "#111")
-  (set-face-background 'cursor "#c96")
-  (set-face-foreground 'font-lock-comment-face "#fc0")
-  (set-face-background 'isearch "#ff0")
-  (set-face-foreground 'isearch "#000")
-  (set-face-background 'lazy-highlight "#990")
-  (set-face-foreground 'lazy-highlight "#000"))
+;; (load-theme 'wombat)
+;; (with-eval-after-load 'wombat-theme
+;;   (set-face-background 'default "#111")
+;;   (set-face-background 'cursor "#c96")
+;;   (set-face-foreground 'font-lock-comment-face "#fc0")
+;;   (set-face-background 'isearch "#ff0")
+;;   (set-face-foreground 'isearch "#000")
+;;   (set-face-background 'lazy-highlight "#990")
+;;   (set-face-foreground 'lazy-highlight "#000"))
+
+(load-theme 'green-phosphor)
 
 ;; Enable line numbers while writing config, code, or text.
 (dolist (hook '(prog-mode-hook conf-mode-hook text-mode-hook))
@@ -70,6 +79,17 @@
 (setq css-indent-offset 2)
 
 ;;; ------------------------------------------------------------------
+;;; 	MELPA
+;;; ------------------------------------------------------------------
+
+(require 'package)
+(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+;; Comment/uncomment this line to enable MELPA Stable if desired.  See `package-archive-priorities`
+;; and `package-pinned-packages`. Most users will not need or want to do this.
+;;(add-to-list 'package-archives '("melpa-stable" . "https://stable.melpa.org/packages/") t)
+(package-initialize)
+
+;;; ------------------------------------------------------------------
 ;;; 	Clean Working Directories
 ;;; ------------------------------------------------------------------
 
@@ -108,6 +128,23 @@
 (global-set-key (kbd "C-c d") 'delete-trailing-whitespace)
 
 (global-set-key (kbd "C-c u i") 'open-user-init-file)
+
+;;; ------------------------------------------------------------------
+;;;     Custom Keys :: Make Ctrl+Backspace sane
+;;; ------------------------------------------------------------------
+
+;;; -- ref: https://stackoverflow.com/questions/28221079/ctrl-backspace-in-emacs-deletes-too-much
+(defun my-backward-kill-spaces-or-char-or-word ()
+  (interactive)
+  (cond
+   ((looking-back (rx (char word)) 1)
+    (backward-kill-word 1))
+   ((looking-back (rx (char blank)) 1)
+    (delete-horizontal-space t))
+   (t
+    (backward-delete-char 1))))
+
+(global-set-key (kbd "<C-backspace>") 'my-backward-kill-spaces-or-char-or-word)
 
 ;;; ------------------------------------------------------------------
 ;;; 	Emacs Server
@@ -189,25 +226,118 @@
   (set-face-foreground 'rainbow-delimiters-depth-8-face "#999")  ; medium gray
   (set-face-foreground 'rainbow-delimiters-depth-9-face "#666")) ; dark gray
 
+
+;;; -----------------------------------------------------------------
+;;; 	Common path variables
+;;; -----------------------------------------------------------------
+
+(defvar init-file-dir (file-name-directory load-file-name))
+
+(defun conf-file (relative-path) (expand-file-name relative-path init-file-dir))
+
+;;; -----------------------------------------------------------------
+;;; 	Janet
+;;; -----------------------------------------------------------------
+
+;; Janet TS mode
+(defvar janet-mode-path (conf-file "_plugins/_janet/janet-ts-mode/janet-ts-mode"))
+(autoload 'janet-ts-mode janet-mode-path nil t)
+(add-to-list 'auto-mode-alist '("\\.janet\\'" . janet-ts-mode))
+
+
+;; Janet REPL
+(add-to-list 'load-path (expand-file-name "_plugins/_janet/ajrepl"))
+(require 'ajrepl)
+(add-hook 'janet-ts-mode-hook #'ajrepl-interaction-mode)
+
+;; Enable Janet Treesitter
+;; -- https://github.com/sogaiu/janet-ts-mode
+(setq treesit-language-source-alist
+      (if (eq 'windows-nt system-type)
+          '((janet-simple
+             . ("https://github.com/sogaiu/tree-sitter-janet-simple"
+                nil nil "gcc.exe")))
+        '((janet-simple
+           . ("https://github.com/sogaiu/tree-sitter-janet-simple")))))
+
+(when (not (treesit-language-available-p 'janet-simple))
+  (treesit-install-language-grammar 'janet-simple))
+
 ;;; -----------------------------------------------------------------
 ;;; 	Fennel
 ;;; -----------------------------------------------------------------
 
-;; (defvar fennel-path (expand-file-name "../../_addons/fennel-mode/fennel-mode" (file-name-directory load-file-name)))
-(defvar this-file-dir (file-name-directory load-file-name))
-(defvar fennel-path (expand-file-name "_plugins/fennel-mode/fennel-mode" this-file-dir))
+(defvar init-file-dir (file-name-directory load-file-name))
+
+(defvar fennel-mode-path (conf-file "_plugins/fennel-mode"))
+(defvar fennel-path (conf-file "_plugins/fennel-mode/fennel-mode"))
 
 (message "[plugin] fennel-path = \"%s\"" fennel-path)
 
 (autoload 'fennel-mode fennel-path nil t)
 (add-to-list 'auto-mode-alist '("\\.fnl\\'" . fennel-mode))
 
-(defvar fennel-ls-path (expand-file-name "_apps/fennel-ls/run_fennel_ls.bat" this-file-dir))
+;;; -----------------------------------------------------------------
+;;; 	Fennel :: proto-repl
+;;; -----------------------------------------------------------------
+
+(defvar fennel-proto-repl-path (conf-file "_plugins/fennel-mode/fennel-proto-repl.el"))
+
+(autoload 'fennel-proto-repl fennel-proto-repl-path nil t)
+(add-hook 'fennel-mode-hook 'fennel-proto-repl-minor-mode)
+
+;;; -----------------------------------------------------------------
+;;; 	Fennel :: Debug fennel-ls
+;;; -----------------------------------------------------------------
+
+;(defvar fennel-ls-path (expand-file-name "_apps/fennel-ls/run_fennel_ls.bat" init-file-dir))
+(defvar fennel-ls-path (conf-file "_apps/fennel-ls/run_fennel_ls.bat"))
+
 
 (with-eval-after-load 'eglot
   (message "[app] About to hook fennel mode to LSP at \"%s\"" fennel-ls-path)
   (add-to-list 'eglot-server-programs `(fennel-mode . (,fennel-ls-path)))
   (message "[app] Hooking complete"))
+
+(defun hexify-string (strg)
+  (mapconcat (lambda (c) (format "%x " c)) strg ""))
+
+(with-eval-after-load 'eglot
+  (define-advice jsonrpc--process-filter (:filter-args (args) fix-newline)
+    "fennel eglot."
+    (when (string-match-p "\\` \\*EGLOT (.+/.*fennel-.+) output\\*\\'"
+                          (buffer-name (process-buffer (car args))))
+
+      (message "--- TEST N: ---")
+      (message "\n")
+      (message "--- test RN: ---")
+      (message "\r\n")
+      (message "--- test R: ---")
+      (message "\r")
+      
+      (message "---TEST-------------------------------------")
+      (message (string-replace "\r\n\r\n" "-AX-" "u _\r\n_\r\n_ O"))
+      (message (string-replace "\r\n\r\n" "-AX-" "u _\n_\n_ O"))
+      (message (string-replace "\r\n\r\n" "-AX-" "u _\r_\r_ O"))
+      (message "--------------------------------------------")
+      (let ((appended (concat (cadr args) "\n")))
+        (message "-------------- BEFORE______________________________")
+        (message (hexify-string (cadr args)))
+        (message "--------____________________________________ APPENDED: ")
+        (message (hexify-string appended))
+        (message "----------------____________________________"))
+      ;(message (hexify-string (cadr args)))
+      (message "HEHE---HERE___HERE___HERE___ BEFORE")
+      (message (cadr args))
+                                        ; (setcdr args (list (string-replace "\n\n" "\r\n\r\n" (cadr args))))
+      (setcdr args (list (concat (cadr args) "\n")))
+      (message "HERE_______HERE_______HERE______2")
+      (message (cadr args))
+      )
+    args))
+
+(setf eglot-events-buffer-size 0)
+(setf eglot-ignored-server-capabilities '(:inlayHintProvider :documentOnTypeFormattingProvider))
 
 ;;; ------------------------------------------------------------------
 ;;; 	The End

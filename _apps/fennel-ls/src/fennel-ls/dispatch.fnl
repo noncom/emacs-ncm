@@ -6,18 +6,21 @@ In general, this involves:
 * determining the type of the message
 * calling the appropriate handler in the :fennel-ls.handlers module.
 "
-
+(local fennel (require :fennel))
 (local handlers (require :fennel-ls.handlers))
 (local message (require :fennel-ls.message))
 
 (λ handle-request [server send id method ?params]
   ;; Call the appropriate request handler.
   ;; The return value of the request is sent back to the server.
+  (io.stderr:write (.. " ---[H]--- Handler=" (fennel.view (. handlers.requests method))))
   (case (. handlers.requests method)
     callback
-    (case (callback server send ?params)
-      (nil err) (send (message.create-error :InternalError err id))
-      ?response (send (message.create-response id ?response)))
+    (let [res (callback server send ?params)]
+	  (io.stderr:write (.. "---[H]--- Res=" (fennel.view res)))
+	  (case res
+        (nil err) (send (message.create-error :InternalError err id))
+        ?response (send (message.create-response id ?response))))
     nil
     (send
       (message.create-error
@@ -48,19 +51,37 @@ Takes:
 * `server`, which is the state of the server,
 * `send`, which is a callback for sending responses, and
 * `msg`, which is the message to receive."
+  (io.stderr:write (.. " ---> handle type: " (type msg)))
   (case (values msg (type msg))
+  
     {:jsonrpc "2.0" : id : method :params ?params}
-    (handle-request server send id method ?params)
+    (do
+	  (io.stderr:write "--- HANDLE A ---\n")
+	  (handle-request server send id method ?params))
+  
     {:jsonrpc "2.0" : method :params ?params}
-    (handle-notification server send method ?params)
+    (do
+	  (io.stderr:write "--- HANDLE B ---\n")
+	  (handle-notification server send method ?params))
+	
     {:jsonrpc "2.0" : id : result}
-    (handle-response server send id result)
+    (do
+   	  (io.stderr:write "--- HANDLE C ---\n")
+	  (handle-response server send id result))
+	
     {:jsonrpc "2.0" : id :error err}
-    (handle-bad-response server send id err)
+    (do
+	  (io.stderr:write "--- HANDLE D ---\n")
+	  (handle-bad-response server send id err))
+	
     (str :string)
-    (send (message.create-error :ParseError str))
-    _
-    (send (message.create-error :BadMessage nil msg.id))))
+    (do
+	  (io.stderr:write "--- HANDLE E ---\n")
+	  (send (message.create-error :ParseError str)))
+    
+	_
+    (do
+	  (send (message.create-error :BadMessage nil msg.id)))))
 
 (λ handle* [server msg]
   "handles a message, and returns all the responses in a table"
