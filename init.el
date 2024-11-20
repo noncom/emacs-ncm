@@ -44,10 +44,13 @@
 (fido-vertical-mode)
 
 ;; Fonts, from https://www.reddit.com/r/emacs/comments/xybrtw/what_is_the_most_appropriate_way_to_set_fonts_in/ 
-(defun font-exists-p (font) (if (null (x-list-fonts font)) nil t))
-(when (window-system)
-  (cond ((font-exists-p "Consolas") (set-frame-font "Consolas:spacing=100:size=14" nil t))
-    ((font-exists-p "Droid Sans") (set-frame-font "Droid Sans:spacing=100:size=14" nil t))))
+;(defun font-exists-p (font) (if (null (x-list-fonts font)) nil t))
+;(when (window-system)
+;  (cond ((font-exists-p "Consolas") (set-frame-font "Consolas:spacing=100:size=14" nil t))
+;    ((font-exists-p "Droid Sans") (set-frame-font "Droid Sans:spacing=100:size=14" nil t))))
+
+;(set-face-attribute 'default nil :height 130)
+(set-face-attribute 'default nil :family "Consolas" :height 120)
 
 ;;; ------------------------------------------------------------------
 ;;; 	Whitespace
@@ -290,6 +293,9 @@
 ;;; 	Fennel :: Debug fennel-ls
 ;;; -----------------------------------------------------------------
 
+;; Good info on advices -- https://scripter.co/emacs-lisp-advice-combinators/
+;; Good info on (define-advice) -- https://emacs.stackexchange.com/questions/51470/define-advice-vs-advice-add-vs-other
+
 ;(defvar fennel-ls-path (expand-file-name "_apps/fennel-ls/run_fennel_ls.bat" init-file-dir))
 (defvar fennel-ls-path (conf-file "_apps/fennel-ls/run_fennel_ls.bat"))
 
@@ -302,10 +308,37 @@
 (defun hexify-string (strg)
   (mapconcat (lambda (c) (format "%x " c)) strg ""))
 
+(defvar fennel-eglot-buffer-regex-string "\\` \\*EGLOT (.+/.*fennel-.+) output\\*\\'")
+(defvar json-rpc-original-content-header-regexp "\\(?:.*: .*\r\n\\)*Content-Length: *\\([[:digit:]]+\\)\r\n\\(?:.*: .*\r\n\\)*\r\n")
+(defvar replacement "\\(HUI\\)*Content-Length: \\([[:digit:]]+\\)")
+
 (with-eval-after-load 'eglot
+  ;; - https://github.com/emacs-mirror/emacs/blob/master/lisp/jsonrpc.el#L732C32-L732C51
+  ;; (define-advice search-forward-regexp (:filter-args (args a b c) fix-regexp)
+  ;;   (message " ------ ARGS ------")
+  ;;   (message "%s" args)
+  ;;   (message "%s" a)
+  ;;   (message "%s" b)
+  ;;   (message "%s" c)
+  ;;   (message "-------------------")
+  ;;   (if (string= json-rpc-original-content-header-regexp a)
+  ;;       (let ((fuck 1
+  ;;                                       ; new-args (list replacement)
+  ;;                   )
+  ;;             (new-args (list args replacement nil c)))
+  ;;                                       ;(setcdr new-args (cdr args))
+  ;;         (message "-<<>>><<>>><<>>-- Returning modified!")
+  ;;         (message "%s" new-args)
+  ;;         new-args)
+  ;;     args))
+
+  (define-advice string-to-number (:filter-args (x) print-string)
+    (message "--------- DETECTED LENGTH: %s" x)
+    x)
+  
   (define-advice jsonrpc--process-filter (:filter-args (args) fix-newline)
     "fennel eglot."
-    (when (string-match-p "\\` \\*EGLOT (.+/.*fennel-.+) output\\*\\'"
+    (when (string-match-p fennel-eglot-buffer-regex-string
                           (buffer-name (process-buffer (car args))))
 
       (message "--- TEST N: ---")
@@ -314,25 +347,32 @@
       (message "\r\n")
       (message "--- test R: ---")
       (message "\r")
-      
+
       (message "---TEST-------------------------------------")
-      (message (string-replace "\r\n\r\n" "-AX-" "u _\r\n_\r\n_ O"))
-      (message (string-replace "\r\n\r\n" "-AX-" "u _\n_\n_ O"))
-      (message (string-replace "\r\n\r\n" "-AX-" "u _\r_\r_ O"))
+      (message (string-replace "\r\n\r\n" "AX" "u _\r\n_\r\n_ O"))
+      (message (string-replace "\r\n\r\n" "AX" "u _\n_\n_ O"))
+      (message (string-replace "\r\n\r\n" "AX" "u _\r_\r_ O"))
       (message "--------------------------------------------")
-      (let ((appended (concat (cadr args) "\n")))
-        (message "-------------- BEFORE______________________________")
+      (let ((appended (concat (cadr args) "\r\n")))
+        (message "_______________HEX BEFORE______________________________")
         (message (hexify-string (cadr args)))
-        (message "--------____________________________________ APPENDED: ")
+        (message "_______________JSON BEFORE_____________________________")
+        (message (cadr args))
+        (message "_______________HEX APPENDED____________________________")
         (message (hexify-string appended))
-        (message "----------------____________________________"))
-      ;(message (hexify-string (cadr args)))
-      (message "HEHE---HERE___HERE___HERE___ BEFORE")
+        (message "_______________JSON APPENDED___________________________")
+        (message appended)
+        (message "_______________________________________________________"))
+                                        ;(message (hexify-string (cadr args)))
+      (message "_______ MESSAGE BEFORE ________________________________")
       (message (cadr args))
-                                        ; (setcdr args (list (string-replace "\n\n" "\r\n\r\n" (cadr args))))
-      (setcdr args (list (concat (cadr args) "\n")))
-      (message "HERE_______HERE_______HERE______2")
+      ;; (setcdr args (list (string-replace "\n\n" "\r\n\r\n" (cadr args))))
+      ;; >>> (setcdr args (list (concat (cadr args) "\r\n")))
+      (let ((replaced (string-replace "NEWLINW" "\r\n\r\n" (cadr args))))
+        (setcdr args (list replaced)))
+      (message "_______ MESSAGE AFTER _________________________________")
       (message (cadr args))
+      (message "____________________END PROCESSING ____________________")
       )
     args))
 

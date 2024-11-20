@@ -10703,9 +10703,11 @@ package.preload["fennel-ls.json-rpc"] = package.preload["fennel-ls.json-rpc"] or
     local msg_stringified = ("Content-Length: " .. #content .. "\n\n" .. content)
     io.stderr:write(("\n\n--- WRITE msg=" .. msg_stringified .. "\n\n"))
     io.stderr:write(("\n\n--- OUT=" .. fennel.view(out) .. "\n\n"))
-    out:write(("Content-Length: " .. #content))
-    out:write("\n\n")
-    out:write(content)
+    --out:write(("Content-Length: " .. #content))
+	out:write(("Content-Length: 10"))
+    out:write("NEWLINW")
+    --out:write(content)
+	out:write("{\"aaaaaaaaaaaaaaa\": 2333}")
     if out.flush then
       return out:flush()
     else
